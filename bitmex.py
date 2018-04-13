@@ -155,7 +155,8 @@ class BitMEX(object):
             'symbol': self.symbol,
             'orderQty': quantity,
             'price': price,
-            'clOrdID': clOrdID
+            'clOrdID': clOrdID,
+            'execInst': 'ParticipateDoNotInitiate'
         }
         return self._curl_bitmex(path=endpoint, postdict=postdict, verb="POST", rethrow_errors=True)
 
