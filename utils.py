@@ -6,6 +6,19 @@ from urllib.parse import urlparse
 from requests.auth import AuthBase
 
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    LIGHT_GREEN = '\033[42m'
+    LIGHT_RED = '\033[101m'
+
+
 class APIKeyAuth(AuthBase):
     """Attaches API Key Authentication to the given Request object."""
 

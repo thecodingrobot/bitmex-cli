@@ -238,7 +238,7 @@ class BitMEX(object):
         return self._curl_bitmex(path=path, postdict=postdict, verb="POST", max_retries=0)
 
     def _curl_bitmex(self, path, query=None, postdict=None, timeout=None, verb=None, rethrow_errors=False,
-                     max_retries=None):
+                     max_retries=10):
         """Send a request to BitMEX Servers."""
         # Handle URL
         url = self.base_url + path
@@ -255,7 +255,7 @@ class BitMEX(object):
         # or you could change the clOrdID (set {"clOrdID": "new", "origClOrdID": "old"}) so that an amend
         # can't erroneously be applied twice.
         if max_retries is None:
-            max_retries = 0 if verb in ['POST', 'PUT'] else 3
+            max_retries = 0 if verb in ['POST', 'PUT'] else 10
 
         # Auth: API Key/Secret
         auth = APIKeyAuthWithExpires(self.apiKey, self.apiSecret)
@@ -269,7 +269,7 @@ class BitMEX(object):
         def retry():
             self.retries += 1
             if self.retries > max_retries:
-                raise Exception("Max retries on %s (%s) hit, raising." % (path, json.dumps(postdict or '')))
+                raise Exception("Max retries (%d) on %s (%s) hit, raising." % (max_retries, path, json.dumps(postdict or '')))
             return self._curl_bitmex(path, query, postdict, timeout, verb, rethrow_errors, max_retries)
 
         # Make the request
@@ -329,7 +329,7 @@ class BitMEX(object):
             elif response.status_code == 503:
                 self.logger.warning("Unable to contact the BitMEX API (503), retrying. " +
                                     "Request: %s \n %s" % (url, json.dumps(postdict)))
-                time.sleep(3)
+                time.sleep(1)
                 return retry()
 
             elif response.status_code == 400:

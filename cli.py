@@ -38,9 +38,11 @@ class BitmexShell(cmd.Cmd):
         super().__init__()
         self.settings['symbol'] = symbol
         if 'testnet' in BASE_URL:
-            self.prompt = '(testnet {symbol}) '.format(**self.settings)
+            self.prompt = '{}testnet{} {}{}{} > '.format(bcolors.LIGHT_GREEN, bcolors.ENDC, bcolors.UNDERLINE, symbol,
+                                                         bcolors.ENDC)
         else:
-            self.prompt = '(live {symbol}) '.format(**self.settings)
+            self.prompt = '{}live{} {}{}{} > '.format(bcolors.LIGHT_RED, bcolors.ENDC, bcolors.UNDERLINE, symbol,
+                                                      bcolors.ENDC)
         self.ws = BitMEXWebsocket(endpoint=BASE_URL, symbol=symbol, api_key=API_KEY, api_secret=API_SECRET)
         self.mex = BitMEX(base_url=BASE_URL, symbol=symbol, apiKey=API_KEY, apiSecret=API_SECRET)
 
@@ -64,65 +66,41 @@ class BitmexShell(cmd.Cmd):
 
         print(table.table)
 
-    def do_set(self, args):
-        """Set internal parameters"""
-
-        param, *value = args.split(' ')
-        print(value)
-
-        if param == 'symbol':
-            self._set_prompt(*value)
-
     @confirm('BUY order')
-    def do_buy(self, args):
+    def do_b(self, args):
         quantity, price = map(lambda x: int(x), args.split(' '))
 
         try:
             self.mex.buy(quantity, price)
-        except requests.exceptions.HTTPError as e:
-            print(e)
-
-    @confirm('BUY order')
-    def do_b(self, args):
-        self.do_buy(args)
-
-    @confirm('MARKET BUY')
-    def do_mbuy(self, args):
-        quantity = int(args.strip())
-        try:
-            resp = self.mex.market_buy(quantity)
-            pprint(resp)
-        except requests.exceptions.HTTPError as e:
+        except Exception as e:
             print(e)
 
     @confirm('MARKET BUY')
     def do_mb(self, args):
-        self.do_mbuy(args)
-
-    @confirm('SELL order')
-    def do_sell(self, args):
-        quantity, price = map(lambda x: int(x), args.split(' '))
-
+        quantity = int(args.strip())
         try:
-            self.mex.sell(quantity, price)
-        except requests.exceptions.HTTPError as e:
+            resp = self.mex.market_buy(quantity)
+            pprint(resp)
+        except Exception as e:
             print(e)
 
     @confirm('SELL order')
     def do_s(self, args):
-        self.do_sell(args)
+        quantity, price = map(lambda x: int(x), args.split(' '))
+
+        try:
+            self.mex.sell(quantity, price)
+        except Exception as e:
+            print(e)
 
     @confirm('MARKET SELL')
-    def do_msell(self, args):
+    def do_ms(self, args):
         quantity = int(args.strip())
         try:
             resp = self.mex.market_sell(quantity)
             pprint(resp)
-        except requests.exceptions.HTTPError as e:
+        except Exception as e:
             print(e)
-
-    def do_ms(self, args):
-        self.do_msell(args)
 
     def do_orders(self, args):
         data = self.ws.open_orders('')
@@ -137,6 +115,9 @@ class BitmexShell(cmd.Cmd):
             ['Symbol', 'Sz', 'AvgEntry', 'Val', 'LiqPx', 'UnPNL', 'rPNL']
         ]
         for d in data:
+            if d['currentQty'] == 0:
+                table_data.append([])
+                continue
             table_data.append(
                 [
                     d['symbol'],
@@ -205,11 +186,6 @@ class BitmexShell(cmd.Cmd):
             else:
                 sys.stdout.write("Please respond with 'yes' or 'no' "
                                  "(or 'y' or 'n').\n")
-
-
-def parse(arg):
-    """Convert a series of zero or more numbers to an argument tuple"""
-    return tuple(map(int, arg.split()))
 
 
 if __name__ == '__main__':
