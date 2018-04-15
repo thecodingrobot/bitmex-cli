@@ -159,11 +159,12 @@ class BitmexShell(cmd.Cmd):
         data = self.mex.get_open_order()
 
         table_data = [
-            ['Sym', 'Side', 'Px', 'Qty', 'Status']
+            ['Id', 'Sym', 'Side', 'Px', 'Qty', 'Status']
         ]
 
         for d in data:
             table_data.append([
+                d['orderID'].split('-')[0],
                 d['symbol'],
                 d['side'],
                 d['price'],
@@ -176,6 +177,17 @@ class BitmexShell(cmd.Cmd):
 
     def do_o(self, args):
         self.do_orders(args)
+
+    @confirm("CANCEL order")
+    def do_cancelorder(self, args):
+        result = self.mex.cancel(args)
+        print(result)
+
+    def complete_cancelorder(self, text, line, begidx, endidx):
+        ids = map(lambda x: x['orderID'], self.mex.get_open_order())
+        if text:
+            return list(filter(lambda x: x.startswith(text), ids))
+        return list(ids)
 
     def do_exit(self, arg):
         pass
