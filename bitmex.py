@@ -37,6 +37,9 @@ def authentication_required(fn):
     return wrapped
 
 
+req_session = requests.Session()
+
+
 class BitMEX(object):
     """BitMEX API Connector."""
 
@@ -59,7 +62,7 @@ class BitMEX(object):
         self.retries = 0  # initialize counter
 
         # Prepare HTTPS session
-        self.session = requests.Session()
+        self.session = req_session
         # These headers are always sent
         self.session.headers.update({'user-agent': 'liquidbot-1.2'})
         self.session.headers.update({'content-type': 'application/json'})
@@ -255,6 +258,11 @@ class BitMEX(object):
     def get_open_order(self):
         path = '/order'
         return self._curl_bitmex(path, verb='GET', query={'filter': json.dumps({'open': True})})
+
+    def get_symbols(self):
+        path = '/instrument'
+        return self._curl_bitmex(path, verb='GET', query={'columns': 'symbol',
+                                                          'filter': json.dumps({'state': 'Open'})})
 
     def _curl_bitmex(self, path, query=None, postdict=None, timeout=None, verb=None, rethrow_errors=False,
                      max_retries=10):

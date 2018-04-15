@@ -6,6 +6,7 @@ from terminaltables import SingleTable
 
 from bitmex import BitMEX
 
+from utils import bcolors
 BASE_URL = "https://testnet.bitmex.com/api/v1/"
 # BASE_URL = "https://www.bitmex.com/api/v1/" # Once you're ready, uncomment this.
 
@@ -31,19 +32,41 @@ class BitmexShell(cmd.Cmd):
     intro = 'Welcome to the Bitmex shell. Type help or ? to list commands.\n'
     file = None
 
-    symbol = 'XBTUSD'
+    _symbol = 'XBTUSD'
     orderIDPrefix = 'cli'
+    mex = None
 
     def __init__(self, symbol):
         super().__init__()
         self.symbol = symbol
+
+    @property
+    def symbol(self):
+        return self._symbol
+
+    @symbol.setter
+    def symbol(self, value: str):
+        value = value.upper()
+        self._symbol = value
         if 'testnet' in BASE_URL:
-            self.prompt = '({}testnet{} {}{}{}) $ '.format(bcolors.LIGHT_GREEN, bcolors.ENDC, bcolors.UNDERLINE, symbol,
-                                                           bcolors.ENDC)
+            self.prompt = '({}testnet{} {}{}{}) $ '.format(bcolors.LIGHT_GREEN, bcolors.ENDC, bcolors.UNDERLINE,
+                                                           self.symbol, bcolors.ENDC)
         else:
-            self.prompt = '({}live{} {}{}{}) $ '.format(bcolors.LIGHT_RED, bcolors.ENDC, bcolors.UNDERLINE, symbol,
+            self.prompt = '({}live{} {}{}{}) $ '.format(bcolors.LIGHT_RED, bcolors.ENDC, bcolors.UNDERLINE, self.symbol,
                                                         bcolors.ENDC)
         self.mex = BitMEX(base_url=BASE_URL, symbol=symbol, apiKey=API_KEY, apiSecret=API_SECRET, postOnly=True)
+
+    def do_symbol(self, args):
+        if len(args) == 0:
+            print('Current symbol: {}'.format(self.symbol))
+        else:
+            self.symbol = args.strip()
+
+    def complete_symbol(self, text, line, begidx, endidx):
+        symbols = filter(lambda x: '_' not in x, map(lambda x: x['symbol'], self.mex.get_symbols()))
+        if text:
+            return list(filter(lambda x: x.startswith(text), symbols))
+        return list(symbols)
 
     def do_funds(self, arg):
         """Print funds"""
@@ -156,12 +179,6 @@ class BitmexShell(cmd.Cmd):
 
     def do_exit(self, arg):
         pass
-
-    def precmd(self, line):
-        line = line.lower()
-        if self.file and 'playback' not in line:
-            print(line, file=self.file)
-        return line
 
     def __del__(self):
         self.mex.close()
