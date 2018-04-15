@@ -1,12 +1,10 @@
 import cmd
 import sys
-import requests
 from pprint import pprint
 
 from terminaltables import SingleTable
 
 from bitmex import BitMEX
-from bitmex_websocket import BitMEXWebsocket
 
 BASE_URL = "https://testnet.bitmex.com/api/v1/"
 # BASE_URL = "https://www.bitmex.com/api/v1/" # Once you're ready, uncomment this.
@@ -23,7 +21,9 @@ def confirm(msg):
         def func_wrapper(instance, name):
             if BitmexShell.query_yes_no('Confirm {}?'.format(msg), default="no"):
                 func(instance, name)
+
         return func_wrapper
+
     return confirm_decorator
 
 
@@ -31,28 +31,23 @@ class BitmexShell(cmd.Cmd):
     intro = 'Welcome to the Bitmex shell. Type help or ? to list commands.\n'
     file = None
 
-    settings = {'symbol': 'XBTUSD'}
+    symbol = 'XBTUSD'
     orderIDPrefix = 'cli'
 
     def __init__(self, symbol):
         super().__init__()
-        self.settings['symbol'] = symbol
+        self.symbol = symbol
         if 'testnet' in BASE_URL:
-            self.prompt = '{}testnet{} {}{}{} > '.format(bcolors.LIGHT_GREEN, bcolors.ENDC, bcolors.UNDERLINE, symbol,
-                                                         bcolors.ENDC)
+            self.prompt = '({}testnet{} {}{}{}) $ '.format(bcolors.LIGHT_GREEN, bcolors.ENDC, bcolors.UNDERLINE, symbol,
+                                                           bcolors.ENDC)
         else:
-            self.prompt = '{}live{} {}{}{} > '.format(bcolors.LIGHT_RED, bcolors.ENDC, bcolors.UNDERLINE, symbol,
-                                                      bcolors.ENDC)
-        self.ws = BitMEXWebsocket(endpoint=BASE_URL, symbol=symbol, api_key=API_KEY, api_secret=API_SECRET)
-        self.mex = BitMEX(base_url=BASE_URL, symbol=symbol, apiKey=API_KEY, apiSecret=API_SECRET)
-
-    def _set_prompt(self, symbol=None):
-        if symbol:
-            self.settings['symbol'] = symbol
+            self.prompt = '({}live{} {}{}{}) $ '.format(bcolors.LIGHT_RED, bcolors.ENDC, bcolors.UNDERLINE, symbol,
+                                                        bcolors.ENDC)
+        self.mex = BitMEX(base_url=BASE_URL, symbol=symbol, apiKey=API_KEY, apiSecret=API_SECRET, postOnly=True)
 
     def do_funds(self, arg):
         """Print funds"""
-        data = self.ws.funds()
+        data = self.mex.get_user_margin()
         table_data = [
             ['Wallet Balance', data['walletBalance'] / (10 ** 8)],
             ['Unrealised PNL', data['unrealisedPnl'] / (10 ** 8)],
@@ -65,6 +60,41 @@ class BitmexShell(cmd.Cmd):
         table.inner_heading_row_border = False
 
         print(table.table)
+
+    def do_positions(self, args):
+        data = self.mex.get_position()
+        table_data = [
+            ['Symbol', 'Sz', 'AvgEntry', 'Val', 'LiqPx', 'UnPNL', 'rPNL']
+        ]
+
+        # print empty table
+        if len(data) == 1:
+            table_data.append([])
+        else:
+            for d in data:
+                if d['currentQty'] == 0:
+                    continue
+                table_data.append(
+                    [
+                        d['symbol'],
+                        d['currentQty'],
+                        d['avgEntryPrice'],
+                        "{0:.4f}".format(d['currentQty'] / d['avgEntryPrice']),
+                        d['liquidationPrice'],
+                        "{0:.4f}".format(d['unrealisedPnl'] / (10 ** 8)),
+                        "{0:.4f}".format(d['realisedPnl'] / (10 ** 8))
+                    ]
+                )
+
+        table = SingleTable(table_data, title='Positions')
+
+        for i in range(0, len(table_data[0])):
+            table.justify_columns[i] = 'right'
+
+        print(table.table)
+
+    def do_p(self, args):
+        self.do_positions(args)
 
     @confirm('BUY order')
     def do_b(self, args):
@@ -103,42 +133,29 @@ class BitmexShell(cmd.Cmd):
             print(e)
 
     def do_orders(self, args):
-        data = self.ws.open_orders('')
-        pprint(data)
+        data = self.mex.get_open_order()
 
-    def do_o(self, args):
-        self.do_orders(args)
-
-    def do_positions(self, args):
-        data = self.ws.positions()
         table_data = [
-            ['Symbol', 'Sz', 'AvgEntry', 'Val', 'LiqPx', 'UnPNL', 'rPNL']
+            ['Sym', 'Side', 'Px', 'Qty', 'Status']
         ]
+
         for d in data:
-            if d['currentQty'] == 0:
-                table_data.append([])
-                continue
-            table_data.append(
-                [
-                    d['symbol'],
-                    d['currentQty'],
-                    d['avgEntryPrice'],
-                    "{0:.4f}".format(d['currentQty'] / d['avgEntryPrice']),
-                    d['liquidationPrice'],
-                    "{0:.4f}".format(d['unrealisedPnl'] / (10 ** 8)),
-                    "{0:.4f}".format(d['realisedPnl'] / (10 ** 8))
-                ]
-            )
+            table_data.append([
+                d['symbol'],
+                d['side'],
+                d['price'],
+                d['orderQty'],
+                d['ordStatus'],
+            ])
 
         table = SingleTable(table_data, title='Positions')
         print(table.table)
 
-    def do_p(self, args):
-        self.do_positions(args)
+    def do_o(self, args):
+        self.do_orders(args)
 
     def do_exit(self, arg):
-        self.close()
-        return True
+        pass
 
     def precmd(self, line):
         line = line.lower()
@@ -146,13 +163,8 @@ class BitmexShell(cmd.Cmd):
             print(line, file=self.file)
         return line
 
-    def close(self):
-        if self.file:
-            self.file.close()
-            self.file = None
-
     def __del__(self):
-        self.ws.exit()
+        self.mex.close()
 
     @staticmethod
     def query_yes_no(question, default="yes"):

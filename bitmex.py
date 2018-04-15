@@ -24,6 +24,19 @@ class MarketEmptyError(Exception):
     pass
 
 
+def authentication_required(fn):
+    """Annotation for methods that require auth."""
+
+    def wrapped(*args):
+        if not args[0].apiKey:
+            msg = "You must be authenticated to use this method"
+            raise AuthenticationError(msg)
+        else:
+            return fn(*args)
+
+    return wrapped
+
+
 class BitMEX(object):
     """BitMEX API Connector."""
 
@@ -89,21 +102,6 @@ class BitMEX(object):
         """
         return self.ws.recent_trades()
 
-    #
-    # Authentication required methods
-    #
-    def authentication_required(fn):
-        """Annotation for methods that require auth."""
-
-        def wrapped(self, *args, **kwargs):
-            if not (self.apiKey):
-                msg = "You must be authenticated to use this method"
-                raise AuthenticationError(msg)
-            else:
-                return fn(self, *args, **kwargs)
-
-        return wrapped
-
     @authentication_required
     def funds(self):
         """Get your current balance."""
@@ -155,9 +153,10 @@ class BitMEX(object):
             'symbol': self.symbol,
             'orderQty': quantity,
             'price': price,
-            'clOrdID': clOrdID,
-            'execInst': 'ParticipateDoNotInitiate'
+            'clOrdID': clOrdID
         }
+        if self.postOnly:
+            postdict['execInst'] = 'ParticipateDoNotInitiate'
         return self._curl_bitmex(path=endpoint, postdict=postdict, verb="POST", rethrow_errors=True)
 
     @authentication_required
@@ -237,6 +236,26 @@ class BitMEX(object):
         }
         return self._curl_bitmex(path=path, postdict=postdict, verb="POST", max_retries=0)
 
+    @authentication_required
+    def get_user_margin(self):
+        path = '/user/margin'
+        return self._curl_bitmex(path, verb='GET')
+
+    @authentication_required
+    def get_position(self):
+        path = '/position'
+        return self._curl_bitmex(path, verb='GET')
+
+    @authentication_required
+    def get_order(self):
+        path = '/order'
+        return self._curl_bitmex(path, verb='GET')
+
+    @authentication_required
+    def get_open_order(self):
+        path = '/order'
+        return self._curl_bitmex(path, verb='GET', query={'filter': json.dumps({'open': True})})
+
     def _curl_bitmex(self, path, query=None, postdict=None, timeout=None, verb=None, rethrow_errors=False,
                      max_retries=10):
         """Send a request to BitMEX Servers."""
@@ -269,7 +288,8 @@ class BitMEX(object):
         def retry():
             self.retries += 1
             if self.retries > max_retries:
-                raise Exception("Max retries (%d) on %s (%s) hit, raising." % (max_retries, path, json.dumps(postdict or '')))
+                raise Exception(
+                    "Max retries (%d) on %s (%s) hit, raising." % (max_retries, path, json.dumps(postdict or '')))
             return self._curl_bitmex(path, query, postdict, timeout, verb, rethrow_errors, max_retries)
 
         # Make the request
@@ -380,3 +400,6 @@ class BitMEX(object):
         self.retries = 0
 
         return response.json()
+
+    def close(self):
+        self.session.close()
