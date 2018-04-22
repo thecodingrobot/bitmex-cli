@@ -296,6 +296,7 @@ class BitMEX(object):
         def retry():
             self.retries += 1
             if self.retries > max_retries:
+                self.retries = 0
                 raise Exception(
                     "Max retries (%d) on %s (%s) hit, raising." % (max_retries, path, json.dumps(postdict or '')))
             return self._curl_bitmex(path, query, postdict, timeout, verb, rethrow_errors, max_retries)
