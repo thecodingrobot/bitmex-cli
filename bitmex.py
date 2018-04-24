@@ -1,10 +1,11 @@
-import requests
-import time
+#!/usr/bin/env python
+import base64
 import datetime
 import json
-import base64
-import uuid
 import logging
+import requests
+import time
+import uuid
 
 from utils import APIKeyAuthWithExpires
 
