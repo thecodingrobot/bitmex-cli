@@ -121,7 +121,7 @@ class BitmexShell(cmd.Cmd):
 
     @confirm('BUY order')
     def do_b(self, args):
-        quantity, price = map(lambda x: int(x), args.split(' '))
+        quantity, price = map(lambda x: float(x), args.split(' '))
 
         try:
             self.mex.buy(quantity, price)
