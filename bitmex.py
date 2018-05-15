@@ -359,7 +359,7 @@ class BitMEX(object):
             elif response.status_code == 503:
                 self.logger.warning("Unable to contact the BitMEX API (503), retrying. " +
                                     "Request: %s \n %s" % (url, json.dumps(postdict)))
-                time.sleep(1)
+                time.sleep(.2)
                 return retry()
 
             elif response.status_code == 400:
